@@ -9,7 +9,9 @@
   Referrer-Policy no-referrer
   Permissions-Policy "geolocation=(), camera=(), microphone=()"
  }
- request_body { max_size 16KB }
+ request_body {
+  max_size 16KB
+ }
  @api path /api/*
  handle @api {
   # Caddy overwrites untrusted incoming forwarded headers by default.
