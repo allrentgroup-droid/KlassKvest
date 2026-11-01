@@ -141,7 +141,10 @@ test('PostgreSQL API integration', { skip: !database }, async t => {
    await pool.query('UPDATE users SET is_admin=true WHERE id=$1',[ids.outsider]);
    assert.equal((await call('GET','/api/admin/overview','outsider')).statusCode,200);
    const original=tokens.outsider;
-   const switched=await call('POST','/api/admin/switch-role','outsider',{role:'student'});
+   const runtimeUrl=new URL(database!); runtimeUrl.searchParams.set('options','-c role=klasskvest_app');
+   const runtimePool=createPool(runtimeUrl.toString()); const runtimeApp=await buildApp(runtimePool);
+   const switched=await runtimeApp.inject({method:'POST',url:'/api/admin/switch-role',headers:{authorization:`Bearer ${tokens.outsider}`},payload:{role:'student'}});
+   await runtimeApp.close(); await runtimePool.end();
    assert.equal(switched.statusCode,200,switched.body);
    assert.equal((await call('GET','/api/me','outsider')).statusCode,401);
    tokens.outsider=switched.json().token;
@@ -208,4 +211,5 @@ test('PostgreSQL API integration', { skip: !database }, async t => {
   await pool.end();
  }
 });
+
 
