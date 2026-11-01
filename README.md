@@ -80,6 +80,9 @@ install -d -m 700 secrets
 umask 077
 openssl rand -hex 32 > secrets/db_owner_password
 openssl rand -hex 32 > secrets/db_app_password
+# Compose монтирует файловые secrets с правами исходного файла.
+# Каталог 700 закрывает доступ на хосте; 444 позволяет непривилегированному Node читать mount.
+chmod 444 secrets/db_owner_password secrets/db_app_password
 docker compose config --quiet
 docker compose up -d --build
 docker compose ps -a
