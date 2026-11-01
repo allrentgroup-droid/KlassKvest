@@ -35,10 +35,15 @@ const test = base.extend<{ pilot: Pilot }>({
       }});
     } finally {
       await app.close();
-      const classes = (await pool.query('SELECT class_id FROM memberships WHERE user_id=$1',[ids.teacher])).rows.map(c=>c.class_id);
+      const demos=(await pool.query('SELECT user_id FROM admin_demo_accounts WHERE administrator_id=$1',[ids.teacher])).rows.map(x=>x.user_id);
+      const classes = (await pool.query('SELECT DISTINCT class_id FROM memberships WHERE user_id=ANY($1::uuid[])',[[ids.teacher,...demos]])).rows.map(c=>c.class_id);
       await pool.query('DELETE FROM votes WHERE poll_id IN (SELECT id FROM polls WHERE class_id=ANY($1::uuid[]))',[classes]);
       for (const table of ['polls','coin_ledger','answers','tasks','memberships','classes']) await pool.query(`DELETE FROM ${table} WHERE ${table==='classes'?'id':'class_id'}=ANY($1::uuid[])`,[classes]);
-      await pool.query('DELETE FROM guardian_links WHERE parent_id=$1',[ids.parent]);
+      await pool.query('DELETE FROM guardian_links WHERE parent_id=ANY($1::uuid[])',[[ids.parent,...demos]]);
+      await pool.query('DELETE FROM sessions WHERE administrator_id=$1',[ids.teacher]);
+      await pool.query('DELETE FROM admin_demo_accounts WHERE administrator_id=$1',[ids.teacher]);
+      await pool.query('DELETE FROM admin_events WHERE administrator_id=$1',[ids.teacher]);
+      await pool.query('DELETE FROM users WHERE id=ANY($1::uuid[])',[demos]);
       await pool.query('DELETE FROM users WHERE id=ANY($1::uuid[])',[Object.values(ids)]);
       await pool.end();
     }
@@ -144,3 +149,31 @@ test('network failure does not save or fabricate an answer; consent revocation c
   const cacheUrls=await page.evaluate(async()=>{ const result:string[]=[]; for(const key of await caches.keys()) for(const req of await (await caches.open(key)).keys()) result.push(req.url); return result; });
   expect(cacheUrls.some(url=>url.includes('/api/'))).toBe(false);
 });
+
+
+test('administrator panel switches sandbox roles and returns to real class',async({page,pilot},testInfo)=>{
+ await pilot.pool.query('UPDATE users SET is_admin=true WHERE id=$1',[pilot.ids.teacher]);
+ await pilot.login(page,'teacher');
+ await expect(page.getByRole('heading',{name:'Панель администратора',exact:true})).toBeVisible();
+ await expect(page.locator('#admin-counts')).toContainText('Активных аккаунтов:');
+ await page.getByLabel('Режим проверки').selectOption('student');
+ await page.getByRole('button',{name:'Переключить роль',exact:true}).click();
+ await expect(page.locator('#admin-mode')).toHaveText('Тестовый режим: Ученик');
+ await expect(page.locator('#class-select option')).toHaveText(['Тестовый класс администратора']);
+ await page.getByRole('button',{name:'Задания',exact:true}).click();
+ await page.getByRole('radio',{name:'4',exact:true}).check();
+ await page.getByRole('button',{name:'Отправить ответ',exact:true}).click();
+ await expect(page.getByText('Верно! +10 монет уже в общей копилке.',{exact:true})).toBeVisible();
+ for (const [role,label] of [['parent','Родитель'],['teacher','Учитель']]) {
+  await page.getByLabel('Режим проверки').selectOption(role);
+  await page.getByRole('button',{name:'Переключить роль',exact:true}).click();
+  await expect(page.locator('#admin-mode')).toHaveText('Тестовый режим: '+label);
+ }
+ await page.getByLabel('Режим проверки').selectOption('admin');
+ await page.getByRole('button',{name:'Переключить роль',exact:true}).click();
+ await expect(page.locator('#admin-mode')).toHaveText('Управление сайтом');
+ await expect(page.locator('#class-select option')).toHaveText(['Пилотный 6 «А»']);
+ await expect(page.locator('#coins')).toHaveText('0');
+ await page.screenshot({path:testInfo.outputPath('administrator.png'),fullPage:true});
+});
+
