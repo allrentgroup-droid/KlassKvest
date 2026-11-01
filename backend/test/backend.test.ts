@@ -172,6 +172,7 @@ test('PostgreSQL API integration', { skip: !database }, async t => {
    await pool.query('DELETE FROM admin_demo_accounts WHERE administrator_id=$1',[ids.outsider]);
    await pool.query('DELETE FROM admin_events WHERE administrator_id=$1',[ids.outsider]);
    await pool.query('DELETE FROM users WHERE id=ANY($1::uuid[])',[demos]);
+   tokens.outsider=(await call('POST','/api/auth/login','outsider',{login:`outsider_${suffix}`,password})).json().token;
   });
   await t.test('revoking consent removes access immediately',async()=>{
    await pool.query('DELETE FROM guardian_links WHERE student_id=$1',[ids.student]);
@@ -207,3 +208,4 @@ test('PostgreSQL API integration', { skip: !database }, async t => {
   await pool.end();
  }
 });
+
