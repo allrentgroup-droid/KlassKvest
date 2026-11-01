@@ -22,7 +22,7 @@ test('PostgreSQL API integration', { skip: !database }, async t => {
  const suffix=randomUUID().slice(0,8);
  const ids: Record<string,string>={}; const tokens: Record<string,string>={};
  const password='integration-secret-123'; const hash=await hashPassword(password);
- const call=async(method:'GET'|'POST',url:string,who?:string,body?:unknown)=>app.inject({method,url,headers:{...(who?{authorization:`Bearer ${tokens[who]}`}:{})},...(body ? {payload:body as object}:{}),remoteAddress:`10.0.0.${Object.keys(ids).indexOf(who??'')+2}`});
+ const call=async(method:'GET'|'POST'|'PATCH',url:string,who?:string,body?:unknown)=>app.inject({method,url,headers:{...(who?{authorization:`Bearer ${tokens[who]}`}:{})},...(body ? {payload:body as object}:{}),remoteAddress:`10.0.0.${Object.keys(ids).indexOf(who??'')+2}`});
  let classId='',otherClass='',taskId='';
  try {
   for (const [name,role] of [['teacher','teacher'],['outsider','teacher'],['student','student'],['student2','student'],['parent','parent'],['stranger','student'],['unconsented','student']]) {
@@ -60,7 +60,8 @@ test('PostgreSQL API integration', { skip: !database }, async t => {
   });
   await t.test('task list never exposes keys or child identities',async()=>{
    const r=await call('GET',`/api/classes/${classId}/tasks`,'student'); assert.equal(r.statusCode,200);
-   assert.deepEqual(Object.keys(r.json().tasks[0]).sort(),['id','options','question','reward']);
+   assert.deepEqual(Object.keys(r.json().tasks[0]).sort(),['id','myAnswer','options','question','reward']);
+   assert.equal(r.json().tasks[0].myAnswer,null);
   });
   const answerUrl=()=>`/api/classes/${classId}/tasks/${taskId}/answers`;
   await t.test('concurrent repeated correct answers credit exactly once',async()=>{
@@ -74,6 +75,22 @@ test('PostgreSQL API integration', { skip: !database }, async t => {
    assert.equal((await call('POST',answerUrl(),'student2',{selectedIndex:1})).json().awarded,0);
    const retry=await call('POST',answerUrl(),'student2',{selectedIndex:0}); assert.equal(retry.json().correct,false); assert.equal(retry.json().replayed,true);
    assert.equal((await call('GET',`/api/classes/${classId}/bank`,'teacher')).json().coins,'30');
+  });
+  await t.test('task history contains only the requesting student answer',async()=>{
+   const own=(await call('GET',`/api/classes/${classId}/tasks`,'student')).json().tasks[0];
+   const other=(await call('GET',`/api/classes/${classId}/tasks`,'student2')).json().tasks[0];
+   assert.deepEqual(own.myAnswer,{selectedIndex:0,correct:true,awarded:30});
+   assert.deepEqual(other.myAnswer,{selectedIndex:1,correct:false,awarded:0});
+   const parent=(await call('GET',`/api/classes/${classId}/tasks`,'parent')).json().tasks[0]; assert.equal(parent.myAnswer,null);
+  });
+  await t.test('class goal changes require its teacher and preserve balance',async()=>{
+   const path=`/api/classes/${classId}/goal`;
+   assert.equal((await call('PATCH',path,'student',{goal:100})).statusCode,403);
+   assert.equal((await call('PATCH',path,'parent',{goal:100})).statusCode,403);
+   assert.equal((await call('PATCH',path,'outsider',{goal:100})).statusCode,404);
+   assert.equal((await call('PATCH',path,'teacher',{goal:1})).statusCode,400);
+   assert.equal((await call('PATCH',path,'teacher',{goal:100})).statusCode,200);
+   assert.deepEqual((await call('GET',`/api/classes/${classId}/bank`,'student')).json(),{coins:'30',goal:'100'});
   });
   await t.test('answer RBAC and task/class mismatch are enforced',async()=>{
    assert.equal((await call('POST',answerUrl(),'parent',{selectedIndex:0})).statusCode,403);
@@ -109,6 +126,9 @@ test('PostgreSQL API integration', { skip: !database }, async t => {
     assert.equal((await call('POST',url,audience==='student'?'parent':'student',{optionIndex:0})).statusCode,403);
     assert.equal((await call('POST',url,audience,{optionIndex:0})).statusCode,204);
     assert.equal((await call('POST',url,audience,{optionIndex:1})).statusCode,204);
+    const visible=(await call('GET',`/api/classes/${classId}/polls`,audience)).json().polls;
+    assert.equal(visible.find((p:{id:string})=>p.id===poll).myVote,1);
+    if(audience==='student') assert.equal((await call('GET',`/api/classes/${classId}/polls`,'student2')).json().polls.find((p:{id:string})=>p.id===poll).myVote,null);
     const results=await call('GET',`/api/classes/${classId}/polls/${poll}/results`,'teacher'); assert.deepEqual(results.json().counts,[{option_index:1,votes:1}]);
     assert.equal((await call('GET',`/api/classes/${classId}/polls/${poll}/results`,audience)).statusCode,403);
     await pool.query("UPDATE polls SET closes_at=now()-interval '1 second' WHERE id=$1",[poll]);
@@ -130,6 +150,12 @@ test('PostgreSQL API integration', { skip: !database }, async t => {
   await t.test('malformed IDs and oversized input are rejected without internals',async()=>{
    const r=await call('GET','/api/classes/not-uuid/bank','outsider'); assert.equal(r.statusCode,400); assert(!r.body.includes('SELECT'));
    const large=await call('POST','/api/classes','outsider',{title:'a'.repeat(20000)}); assert.equal(large.statusCode,413);
+  });
+  await t.test('public shell has strict CSP while API remains protected',async()=>{
+   const home=await app.inject({url:'/'}); assert.equal(home.statusCode,200); assert(home.body.includes('КлассКвест')); assert(home.headers['content-security-policy']?.includes("script-src 'self'"));
+   for(const path of ['/app.js','/styles.css','/manifest.webmanifest','/icon-192.png','/icon-512.png','/sw.js']) assert.equal((await app.inject({url:path})).statusCode,200,path);
+   assert.equal((await app.inject({url:'/src/app.ts'})).statusCode,404);
+   assert.equal((await app.inject({url:'/api/me'})).statusCode,401);
   });
  } finally {
   await app.close();

@@ -12,11 +12,8 @@
  request_body {
   max_size 16KB
  }
- @api path /api/*
- handle @api {
+ handle {
   # Caddy overwrites untrusted incoming forwarded headers by default.
   reverse_proxy api:3000
  }
- respond /health/live "ok" 200
- respond "KlassKvest API" 404
 }

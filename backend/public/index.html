@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#185c46">
+  <meta name="description" content="КлассКвест — задания и общая копилка класса.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="КлассКвест">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="stylesheet" href="/styles.css">
+  <title>КлассКвест · Вместе к приключению</title>
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <a class="skip" href="#main">К содержимому</a>
+  <header class="header">
+    <a href="/" class="brand" aria-label="КлассКвест, главная"><img src="/icon.svg" width="42" height="42" alt=""><span>Класс<span class="brand-light">Квест</span><small>Вместе к приключению</small></span></a>
+    <div class="header-actions"><button id="install" class="button subtle" hidden>Установить</button><span id="role" class="badge" hidden></span><button id="logout" class="button subtle" hidden>Выйти</button></div>
+  </header>
+  <main id="main" tabindex="-1">
+    <section id="login-screen" class="welcome">
+      <div class="welcome-copy"><span class="eyebrow">У каждого свой вклад. Цель — общая.</span><h1>Маленькие победы.<br>Большие <em>приключения.</em></h1><p class="lead">Решайте задания, пополняйте общую копилку и выбирайте, куда отправиться всем классом.</p><div class="journey" aria-label="Путь класса"><span>01 <b>Узнаём</b></span><span>02 <b>Копим</b></span><span>03 <b>Выбираем</b></span></div><p class="privacy-note">Только ваш класс. Без публичных профилей, чатов и геолокации.</p></div>
+      <div class="card login-card"><span class="eyebrow">Ваше место в команде</span><h2>Войти в КлассКвест</h2><p class="muted">Учётную запись выдаёт организатор класса.</p><form id="login-form"><label>Логин<input name="login" autocomplete="username" autocapitalize="none" spellcheck="false" pattern="[a-z0-9_-]{3,64}" minlength="3" maxlength="64" required placeholder="Ваш логин"></label><label>Пароль<input name="password" type="password" autocomplete="current-password" maxlength="128" required placeholder="Ваш пароль"></label><button class="button primary full" type="submit">Войти в свой класс <span aria-hidden="true">→</span></button></form><p class="form-note">Нет доступа или забыли пароль? Обратитесь к организатору класса.</p><details><summary>Как добавить на главный экран</summary><p>На Android откройте меню браузера и выберите «Установить приложение» или «Добавить на главный экран». На iPhone в Safari: «Поделиться» → «На экран Домой».</p><p>Вход и задания работают с интернетом. После перезапуска приложения потребуется войти снова.</p></details></div>
+    </section>
+    <section id="workspace" hidden>
+      <div class="workspace-heading"><div><span class="eyebrow">Наша команда</span><h1>Мой класс</h1></div><div class="class-picker"><label for="class-select">Выберите класс</label><select id="class-select"></select><button id="retry-session" class="button subtle" type="button">Обновить список классов</button></div></div>
+      <div id="no-classes" class="card empty" hidden><h2>Здесь скоро будет ваш класс</h2><p>Организатор добавит вас в класс и проверит родительское согласие.</p></div>
+      <form id="class-form" class="card inline-form" hidden><label>Новый класс<input name="title" required maxlength="80" placeholder="Например, 6 «А»"></label><button type="submit" class="button primary">Создать класс</button></form>
+      <div id="class-content" hidden>
+        <nav class="tabs" aria-label="Разделы класса"><button data-tab="bank" aria-current="page">Копилка</button><button data-tab="tasks">Задания</button><button data-tab="polls">Голосования</button></nav>
+        <section id="bank-panel"><div class="bank-layout"><div class="card bank-card"><div class="bank-top"><span class="eyebrow">Общая копилка</span><span id="sync" class="sync">Обновляем…</span></div><h2>Каждое задание —<br>шаг к общей цели</h2><div class="coin-total"><span id="coins">—</span><span class="coin-symbol" aria-hidden="true">✦</span></div><p class="muted">игровых монет в копилке класса</p><progress id="progress" max="100" value="0" aria-label="Прогресс к цели"></progress><div class="progress-caption"><span>Цель: <b id="goal">—</b> монет</span><b id="percent">0%</b></div><p id="goal-message" class="bank-message">Каждый вклад имеет значение.</p><div class="bank-actions"><button class="button primary" data-go="tasks">К заданиям →</button><button id="refresh" class="button secondary">Обновить</button></div></div><aside class="card team-card"><span class="team-illustration" aria-hidden="true">✦<span>↗</span>✦</span><span class="eyebrow">Мы — одна команда</span><h2>Здесь важен<br>каждый.</h2><p>Монеты складываются в общую копилку. Вместе вы приближаете следующее приключение.</p><button class="button secondary" data-go="polls">Выбрать приключение →</button><p class="form-note">Игровые монеты не являются деньгами.</p></aside></div><form id="goal-form" class="card inline-form" hidden><label>Цель класса в монетах<input name="goal" type="number" min="100" max="1000000" step="1" required></label><button class="button secondary" type="submit">Изменить цель</button></form></section>
+        <section id="tasks-panel" hidden><div class="section-heading"><div><span class="eyebrow">Маленькие победы</span><h2>Задания класса</h2></div><p id="task-hint" class="muted"></p></div><div id="tasks" class="card-grid"></div><button id="more-tasks" class="button secondary" hidden>Ещё задания</button><details id="task-editor" class="card editor" hidden><summary>Добавить задание</summary><form id="task-form"><label>Вопрос<textarea name="question" maxlength="2000" required rows="3"></textarea></label><label>Варианты ответа — каждый с новой строки<textarea name="options" required rows="4" placeholder="Первый вариант&#10;Второй вариант"></textarea></label><div class="form-row"><label>Номер правильного варианта<input name="correctIndex" type="number" min="1" max="6" value="1" required></label><label>Награда в монетах<input name="reward" type="number" min="1" max="1000" value="30" required></label></div><button class="button primary" type="submit">Опубликовать задание</button><p class="form-note">Задание нельзя изменить после публикации. Не указывайте личные данные детей.</p></form></details></section>
+        <section id="polls-panel" hidden><div class="section-heading"><div><span class="eyebrow">Решаем вместе</span><h2>Наше приключение</h2></div><p id="poll-hint" class="muted"></p></div><div id="polls" class="card-grid"></div><button id="more-polls" class="button secondary" hidden>Ещё голосования</button><details id="poll-editor" class="card editor" hidden><summary>Создать голосование</summary><form id="poll-form"><label>Вопрос<input name="title" maxlength="200" required placeholder="Куда отправимся всем классом?"></label><label>Кто голосует<select name="audience"><option value="student">Ученики</option><option value="parent">Родители</option></select></label><label>Варианты — каждый с новой строки<textarea name="options" required rows="4"></textarea></label><label>Завершение по вашему местному времени<input name="closesAt" type="datetime-local" required></label><button class="button primary" type="submit">Открыть голосование</button><p class="form-note">До 90 дней. Решения о расходах и безопасности согласуются отдельно.</p></form></details></section>
+      </div>
+    </section>
+    <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+    <noscript><p class="card">Для КлассКвеста включите JavaScript в настройках браузера.</p></noscript>
+  </main>
+  <footer>КлассКвест <span aria-hidden="true">·</span> Учимся. Объединяемся. Открываем новое.</footer>
+</body>
+</html>

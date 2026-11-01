@@ -3,6 +3,7 @@ import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import { z } from 'zod';
 import type pg from 'pg';
+import { readFile } from 'node:fs/promises';
 import { transaction } from './db.js';
 import { digest, token, hashPassword, verifyPassword } from './security.js';
 
@@ -16,7 +17,7 @@ const params = (r: FastifyRequest) => z.object({ classId: uuid, id: uuid.optiona
 export async function buildApp(pool: pg.Pool, sessionHours = 8, behindProxy = false) {
  const app = Fastify({ bodyLimit: 16384, trustProxy: behindProxy ? (_address,hop) => hop===0 : false, logger: false, requestTimeout: 15000 });
  await app.register(helmet);
- await app.register(rateLimit, { max: 120, timeWindow: '1 minute' });
+ await app.register(rateLimit, { max: 300, timeWindow: '1 minute' });
  const dummyHash = await hashPassword(token());
  app.setErrorHandler((error, req, reply) => {
   const e = error as Error & { code?: string; statusCode?: number };
@@ -28,9 +29,14 @@ export async function buildApp(pool: pg.Pool, sessionHours = 8, behindProxy = fa
  app.addHook('onSend', async (_req, reply) => { reply.header('Cache-Control','no-store'); });
  app.decorateRequest('actor', null as unknown as Actor);
  app.decorateRequest('sessionHash', '');
+ // Explicit public shell allowlist: no filesystem traversal or directory listing.
+ for (const [path,mime] of Object.entries({ 'index.html':'text/html; charset=utf-8', 'app.js':'text/javascript; charset=utf-8', 'styles.css':'text/css; charset=utf-8', 'manifest.webmanifest':'application/manifest+json', 'sw.js':'text/javascript; charset=utf-8', 'icon.svg':'image/svg+xml', 'icon-192.png':'image/png', 'icon-512.png':'image/png' })) {
+  const contents = await readFile(new URL(`../public/${path}`,import.meta.url));
+  app.get(path==='index.html' ? '/' : `/${path}`, async (_req,reply) => reply.type(mime).send(contents));
+ }
  app.get('/health/live', async () => ({ status: 'ok' }));
  app.get('/health/ready', async () => { await pool.query('SELECT 1 FROM schema_migrations LIMIT 1'); return { status: 'ok' }; });
- app.post('/api/auth/login', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
+ app.post('/api/auth/login', { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req, reply) => {
   const b = z.object({ login: z.string().min(3).max(64).regex(/^[a-z0-9_-]+$/), password: z.string().min(1).max(128) }).strict().parse(req.body);
   // Shared persistent account limiter survives restarts and multiple API processes.
   const key = digest(b.login);
@@ -75,13 +81,18 @@ export async function buildApp(pool: pg.Pool, sessionHours = 8, behindProxy = fa
   });
   api.get('/api/classes/:classId/bank', async req => {
    const { classId } = params(req); await member(req,classId);
-   return (await pool.query('SELECT COALESCE(sum(amount),0)::text AS coins FROM coin_ledger WHERE class_id=$1',[classId])).rows[0];
+   return (await pool.query('SELECT c.goal::text AS goal, (SELECT COALESCE(sum(amount),0)::text FROM coin_ledger WHERE class_id=c.id) AS coins FROM classes c WHERE c.id=$1',[classId])).rows[0];
+  });
+  api.patch('/api/classes/:classId/goal', async req => {
+   const { classId } = params(req); await member(req,classId,'teacher');
+   const b = z.object({ goal: z.number().int().min(100).max(1000000) }).strict().parse(req.body);
+   return (await pool.query('UPDATE classes SET goal=$2 WHERE id=$1 RETURNING goal::text',[classId,b.goal])).rows[0];
   });
   api.get('/api/classes/:classId/tasks', async req => {
    const { classId } = params(req); await member(req,classId);
    const q = z.object({ after: uuid.optional() }).parse(req.query);
    // Answer keys and other children's submissions are never returned.
-   return { tasks: (await pool.query(`SELECT id,question,options,reward FROM tasks WHERE class_id=$1 AND ($2::uuid IS NULL OR id>$2) ORDER BY id LIMIT 100`,[classId,q.after ?? null])).rows };
+   return { tasks: (await pool.query(`SELECT t.id,t.question,t.options,t.reward, CASE WHEN a.id IS NULL THEN NULL ELSE json_build_object('selectedIndex',a.selected_index,'correct',a.correct,'awarded',CASE WHEN a.correct THEN t.reward ELSE 0 END) END AS "myAnswer" FROM tasks t LEFT JOIN answers a ON a.task_id=t.id AND a.student_id=$3 WHERE t.class_id=$1 AND ($2::uuid IS NULL OR t.id>$2) ORDER BY t.id LIMIT 100`,[classId,q.after ?? null,req.actor.id])).rows };
   });
   api.post('/api/classes/:classId/tasks', async (req,reply) => {
    const { classId } = params(req); await member(req,classId,'teacher');
@@ -111,7 +122,7 @@ export async function buildApp(pool: pg.Pool, sessionHours = 8, behindProxy = fa
   api.get('/api/classes/:classId/polls', async req => {
    const { classId } = params(req); await member(req,classId);
    const q = z.object({ after: uuid.optional() }).parse(req.query);
-   return { polls: (await pool.query(`SELECT id,title,audience,options,closes_at FROM polls WHERE class_id=$1 AND (audience=$2 OR $2='teacher') AND ($3::uuid IS NULL OR id>$3) ORDER BY id LIMIT 100`,[classId,req.actor.role,q.after ?? null])).rows };
+   return { polls: (await pool.query(`SELECT p.id,p.title,p.audience,p.options,p.closes_at,v.option_index AS "myVote" FROM polls p LEFT JOIN votes v ON v.poll_id=p.id AND v.user_id=$4 WHERE p.class_id=$1 AND (p.audience=$2 OR $2='teacher') AND ($3::uuid IS NULL OR p.id>$3) ORDER BY p.id LIMIT 100`,[classId,req.actor.role,q.after ?? null,req.actor.id])).rows };
   });
   api.post('/api/classes/:classId/polls/:id/votes', async (req,reply) => {
    const { classId,id } = params(req); await member(req,classId);

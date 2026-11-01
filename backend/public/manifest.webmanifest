@@ -1,0 +1,9 @@
+{
+  "id": "/", "name": "КлассКвест", "short_name": "КлассКвест", "lang": "ru",
+  "description": "Учимся и копим монеты на общее приключение класса.",
+  "start_url": "/", "scope": "/", "display": "standalone", "background_color": "#f7f7ee", "theme_color": "#185c46",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
