@@ -50,6 +50,7 @@ jobs:
           ACME_EMAIL: ci@example.com
         run: |
           docker compose run --rm --no-deps proxy caddy validate --config /etc/caddy/Caddyfile
+          ACME_EMAIL= docker compose run --rm --no-deps proxy caddy validate --config /etc/caddy/Caddyfile
           docker compose up -d --build --wait --wait-timeout 180 db api proxy
           curl --insecure --silent --show-error --retry 10 --retry-connrefused --retry-delay 2 --fail https://localhost/health/live
           curl --insecure --silent --show-error --fail https://localhost/ | grep -q 'Войти в КлассКвест'
