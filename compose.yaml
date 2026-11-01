@@ -1,0 +1,83 @@
+name: klasskvest
+services:
+  db:
+    image: postgres:17-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: klasskvest
+      POSTGRES_USER: klasskvest_owner
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_owner_password
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    secrets: [db_owner_password, db_app_password]
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./deploy/init-db.sh:/docker-entrypoint-initdb.d/10-app.sh:ro
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U klasskvest_owner -d klasskvest]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [database]
+    security_opt: [no-new-privileges:true]
+  migrate:
+    build: ./backend
+    command: [node, dist/migrate.js]
+    environment:
+      NODE_ENV: production
+      DB_USER: klasskvest_owner
+      DB_PASSWORD_FILE: /run/secrets/db_owner_password
+    secrets: [db_owner_password]
+    depends_on:
+      db: { condition: service_healthy }
+    networks: [database]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+  api:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DB_USER: klasskvest_app
+      DB_PASSWORD_FILE: /run/secrets/db_app_password
+      SESSION_HOURS: ${SESSION_HOURS:-8}
+    secrets: [db_app_password]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    networks: [database, edge]
+    read_only: true
+    tmpfs: ["/tmp:size=16m,noexec,nosuid"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 512m
+    pids_limit: 100
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN in .env}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api: { condition: service_healthy }
+    networks: [edge]
+    security_opt: [no-new-privileges:true]
+secrets:
+  db_owner_password: { file: ./secrets/db_owner_password }
+  db_app_password: { file: ./secrets/db_app_password }
+volumes:
+  db_data:
+  caddy_data:
+  caddy_config:
+networks:
+  database: { internal: true }
+  edge:

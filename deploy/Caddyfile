@@ -1,0 +1,19 @@
+{
+ email "{$ACME_EMAIL}"
+ admin off
+}
+{$DOMAIN} {
+ header {
+  Strict-Transport-Security "max-age=31536000"
+  X-Content-Type-Options nosniff
+  Referrer-Policy no-referrer
+  Permissions-Policy "geolocation=(), camera=(), microphone=()"
+ }
+ request_body {
+  max_size 16KB
+ }
+ handle {
+  # Caddy overwrites untrusted incoming forwarded headers by default.
+  reverse_proxy api:3000
+ }
+}

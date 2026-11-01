@@ -1,0 +1,74 @@
+name: Backend checks
+on:
+  push:
+    paths: ['backend/**', 'compose.yaml', 'deploy/**', '.github/workflows/backend.yml']
+  pull_request:
+    paths: ['backend/**', 'compose.yaml', 'deploy/**', '.github/workflows/backend.yml']
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: klasskvest_test
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      DATABASE_URL: postgres://postgres:ci-only-password@localhost:5432/klasskvest_test
+      NODE_ENV: test
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - run: npx playwright install --with-deps chromium --only-shell
+      - run: npm run test:e2e
+      - run: npm audit --omit=dev --audit-level=high
+      - run: docker build -t klasskvest-backend:test .
+      - run: |
+          mkdir -p secrets
+          printf 'ci-owner-password' > secrets/db_owner_password
+          printf 'ci-app-password' > secrets/db_app_password
+          DOMAIN=localhost ACME_EMAIL=ci@example.com docker compose config --quiet
+        working-directory: .
+      - name: Compose smoke test with restricted runtime role
+        working-directory: .
+        env:
+          DOMAIN: localhost
+          ACME_EMAIL: ci@example.com
+        run: |
+          docker compose run --rm --no-deps proxy caddy validate --config /etc/caddy/Caddyfile
+          ACME_EMAIL= docker compose run --rm --no-deps proxy caddy validate --config /etc/caddy/Caddyfile
+          docker compose up -d --build --wait --wait-timeout 180 db api proxy
+          curl --insecure --silent --show-error --retry 10 --retry-connrefused --retry-delay 2 --fail https://localhost/health/live
+          curl --insecure --silent --show-error --fail https://localhost/ | grep -q 'Войти в КлассКвест'
+          curl --insecure --silent --show-error --fail https://localhost/manifest.webmanifest | grep -q 'standalone'
+          docker compose exec -T api node -e "fetch('http://127.0.0.1:3000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+          docker compose run --rm -T migrate node dist/admin.js user ci_teacher teacher Teacher <<<'ci-only-long-password'
+          docker compose exec -T api node --input-type=module -e "const r=await fetch('http://127.0.0.1:3000/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({login:'ci_teacher',password:'ci-only-long-password'})}); if(!r.ok)throw Error('login failed'); const {token}=await r.json(); const c=await fetch('http://127.0.0.1:3000/api/classes',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+token},body:JSON.stringify({title:'CI'})}); if(c.status!==201)throw Error('class creation failed');"
+      - name: Compose logs on failure
+        if: failure()
+        working-directory: .
+        run: docker compose logs --tail=80
+        env:
+          DOMAIN: localhost
+          ACME_EMAIL: ci@example.com
+      - name: Compose cleanup
+        if: always()
+        working-directory: .
+        run: docker compose down -v
+        env:
+          DOMAIN: localhost
+          ACME_EMAIL: ci@example.com
