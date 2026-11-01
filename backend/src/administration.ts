@@ -7,10 +7,11 @@ import { digest, hashPassword, token } from './security.js';
 export async function switchRole(pool: pg.Pool, administratorId: string, role: 'admin'|'teacher'|'student'|'parent', sessionHash: string) {
  const inaccessiblePassword = await hashPassword(token());
  return transaction(pool,async db=>{
-  const owner=await db.query('SELECT id FROM users WHERE id=$1 AND active AND is_admin FOR UPDATE',[administratorId]);
+  await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 91841))',[administratorId]);
+  const owner=await db.query('SELECT id FROM users WHERE id=$1 AND active AND is_admin',[administratorId]);
   if (!owner.rowCount) return null;
-  // Lock and validate the actual session too: parallel switches cannot reuse it.
-  const session=await db.query('SELECT user_id,administrator_id FROM sessions WHERE token_hash=$1 AND expires_at>now() FOR UPDATE',[sessionHash]);
+  // Atomically consume the session; rollback restores it on any later failure.
+  const session=await db.query('DELETE FROM sessions WHERE token_hash=$1 AND expires_at>now() RETURNING user_id,administrator_id',[sessionHash]);
   if (!session.rowCount || (session.rows[0].administrator_id ?? session.rows[0].user_id)!==administratorId) return null;
   if (role!=='admin') {
    const existing=await db.query('SELECT role,user_id FROM admin_demo_accounts WHERE administrator_id=$1',[administratorId]);
@@ -36,3 +37,4 @@ export async function switchRole(pool: pg.Pool, administratorId: string, role: '
   return {token:value,tokenType:'Bearer',expiresIn:3600};
  });
 }
+
