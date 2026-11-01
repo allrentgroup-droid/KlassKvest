@@ -26,6 +26,8 @@ function signedOut() {
   scope(); clearClass(); state.token = null; state.user = null; state.classes = [];
   $('login-screen').hidden = false; $('workspace').hidden = true;
   $('role').hidden = true; $('logout').hidden = true;
+  $('admin-panel').hidden = true;
+  $('admin-events').replaceChildren();
   $('class-select').replaceChildren();
   for (const name of ['login-form','class-form','goal-form','task-form','poll-form']) $(name).reset();
   $('login-form').elements.login.focus();
@@ -228,7 +230,7 @@ $('login-form').addEventListener('submit',event=>{
     catch (error) { signedOut(); throw error; }
     $('login-screen').hidden = true; $('workspace').hidden = false;
     $('role').textContent = roleNames[state.user.role]; $('role').hidden = false; $('logout').hidden = false;
-    teacherTools(); tab('bank');
+    teacherTools(); await loadAdministration(); tab('bank');
     await loadClasses(); $('main').focus();
   });
 });
@@ -283,3 +285,30 @@ $('install').addEventListener('click',async()=>{
 });
 window.addEventListener('appinstalled',()=>{ installPrompt = null; $('install').hidden = true; });
 if ('serviceWorker' in navigator && window.isSecureContext) navigator.serviceWorker.register('/sw.js').catch(()=>{});
+
+async function loadAdministration() {
+  const visible=!!state.user?.administratorId;
+  $('admin-panel').hidden=!visible;
+  if (!visible) return;
+  $('admin-mode').textContent=state.user.testRole ? 'Тестовый режим: '+roleNames[state.user.role] : 'Управление сайтом';
+  $('admin-switch-form').elements.role.value=state.user.testRole ? state.user.role : 'admin';
+  $('admin-counts').textContent=''; $('admin-events').replaceChildren();
+  if (!state.user.testRole) {
+    const {counts,events}=await api('/api/admin/overview');
+    $('admin-counts').textContent='Активных аккаунтов: '+counts.users+' · Классов: '+counts.classes+' · Заданий: '+counts.tasks;
+    for (const event of events) $('admin-events').append(node('li',({switch_teacher:'Тестовый учитель',switch_student:'Тестовый ученик',switch_parent:'Тестовый родитель',return_admin:'Возврат администратора'}[event.action] ?? event.action)+' · '+new Date(event.created_at).toLocaleString('ru-RU')));
+  }
+}
+$('admin-switch-form').addEventListener('submit',event=>{
+ event.preventDefault();
+ const role=event.currentTarget.elements.role.value;
+ void busy(event.currentTarget,async()=>{
+  const result=await api('/api/admin/switch-role',{method:'POST',body:{role}});
+  scope(); clearClass(); state.token=result.token;
+  state.user=(await api('/api/me')).user;
+  $('role').textContent=roleNames[state.user.role];
+  teacherTools(); await loadAdministration(); await loadClasses();
+  tab('bank'); notice(state.user.testRole ? 'Вы в отдельном тестовом классе.' : 'Вы вернулись в панель администратора.');
+ });
+});
+

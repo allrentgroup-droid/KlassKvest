@@ -1,38 +1,228 @@
-<!doctype html>
-<html lang="ru">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#185c46">
-  <meta name="description" content="КлассКвест — задания и общая копилка класса.">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="КлассКвест">
-  <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="icon" href="/icon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="/icon-192.png">
-  <link rel="stylesheet" href="/styles.css">
-  <title>КлассКвест · Вместе к приключению</title>
-  <script type="module" src="/app.js"></script>
-</head>
-<body>
-  <a class="skip" href="#main">К содержимому</a>
-  <header class="header">
-    <a href="/" class="brand" aria-label="КлассКвест, главная"><img src="/icon.svg" width="42" height="42" alt=""><span>Класс<span class="brand-light">Квест</span><small>Вместе к приключению</small></span></a>
-    <div class="header-actions"><button id="install" class="button subtle" hidden>Установить</button><span id="role" class="badge" hidden></span><button id="logout" class="button subtle" hidden>Выйти</button></div>
-  </header>
-  <main id="main" tabindex="-1">
-    <section id="login-screen" class="welcome">
-      <div class="welcome-copy"><span class="eyebrow">У каждого свой вклад. Цель — общая.</span><h1>Маленькие победы.<br>Большие <em>приключения.</em></h1><p class="lead">Решайте задания, пополняйте общую копилку и выбирайте, куда отправиться всем классом.</p><div class="journey" aria-label="Путь класса"><span>01 <b>Узнаём</b></span><span>02 <b>Копим</b></span><span>03 <b>Выбираем</b></span></div><p class="privacy-note">Только ваш класс. Без публичных профилей, чатов и геолокации.</p></div>
-      <div class="card login-card"><span class="eyebrow">Ваше место в команде</span><h2>Войти в КлассКвест</h2><p class="muted">Учётную запись выдаёт организатор класса.</p><form id="login-form"><label>Логин<input name="login" autocomplete="username" autocapitalize="none" spellcheck="false" pattern="[a-z0-9_-]{3,64}" minlength="3" maxlength="64" required placeholder="Ваш логин"></label><label>Пароль<input name="password" type="password" autocomplete="current-password" maxlength="128" required placeholder="Ваш пароль"></label><button class="button primary full" type="submit">Войти в свой класс <span aria-hidden="true">→</span></button></form><p class="form-note">Нет доступа или забыли пароль? Обратитесь к организатору класса.</p><details><summary>Как добавить на главный экран</summary><p>На Android откройте меню браузера и выберите «Установить приложение» или «Добавить на главный экран». На iPhone в Safari: «Поделиться» → «На экран Домой».</p><p>Вход и задания работают с интернетом. После перезапуска приложения потребуется войти снова.</p></details></div>
-    </section>
-    <section id="workspace" hidden>
-      <div class="workspace-heading"><div><span class="eyebrow">Наша команда</span><h1>Мой класс</h1></div><div class="class-picker"><label for="class-select">Выберите класс</label><select id="class-select"></select><button id="retry-session" class="button subtle" type="button">Обновить список классов</button></div></div>
-      <div id="no-classes" class="card empty" hidden><h2>Здесь скоро будет ваш класс</h2><p>Организатор добавит вас в класс и проверит родительское согласие.</p></div>
-      <form id="class-form" class="card inline-form" hidden><label>Новый класс<input name="title" required maxlength="80" placeholder="Например, 6 «А»"></label><button type="submit" class="button primary">Создать класс</button></form>
-      <div id="class-content" hidden>
-        <nav class="tabs" aria-label="Разделы класса"><button data-tab="bank" aria-current="page">Копилка</button><button data-tab="tasks">Задания</button><button data-tab="polls">Голосования</button></nav>
-        <section id="bank-panel"><div class="bank-layout"><div class="card bank-card"><div class="bank-top"><span class="eyebrow">Общая копилка</span><span id="sync" class="sync">Обновляем…</span></div><h2>Каждое задание —<br>шаг к общей цели</h2><div class="coin-total"><span id="coins">—</span><span class="coin-symbol" aria-hidden="true">✦</span></div><p class="muted">игровых монет в копилке класса</p><progress id="progress" max="100" value="0" aria-label="Прогресс к цели"></progress><div class="progress-caption"><span>Цель: <b id="goal">—</b> монет</span><b id="percent">0%</b></div><p id="goal-message" class="bank-message">Каждый вклад имеет значение.</p><div class="bank-actions"><button class="button primary" data-go="tasks">К заданиям →</button><button id="refresh" class="button secondary">Обновить</button></div></div><aside class="card team-card"><span class="team-illustration" aria-hidden="true">✦<span>↗</span>✦</span><span class="eyebrow">Мы — одна команда</span><h2>Здесь важен<br>каждый.</h2><p>Монеты складываются в общую копилку. Вместе вы приближаете следующее приключение.</p><button class="button secondary" data-go="polls">Выбрать приключение →</button><p class="form-note">Игровые монеты не являются деньгами.</p></aside></div><form id="goal-form" class="card inline-form" hidden><label>Цель класса в монетах<input name="goal" type="number" min="100" max="1000000" step="1" required></label><button class="button secondary" type="submit">Изменить цель</button></form></section>
-        <section id="tasks-panel" hidden><div class="section-heading"><div><span class="eyebrow">Маленькие победы</span><h2>Задания класса</h2></div><p id="task-hint" class="muted"></p></div><div id="tasks" class="card-grid"></div><button id="more-tasks" class="button secondary" hidden>Ещё задания</button><details id="task-editor" class="card editor" hidden><summary>Добавить задание</summary><form id="task-form"><label>Вопрос<textarea name="question" maxlength="2000" required rows="3"></textarea></label><label>Варианты ответа — каждый с новой строки<textarea name="options" required rows="4" placeholder="Первый вариант&#10;Второй вариант"></textarea></label><div class="form-row"><label>Номер правильного варианта<input name="correctIndex" type="number" min="1" max="6" value="1" required></label><label>Награда в монетах<input name="reward" type="number" min="1" max="1000" value="30" required></label></div><button class="button primary" type="submit">Опубликовать задание</button><p class="form-note">Задание нельзя изменить после публикации. Не указывайте личные данные детей.</p></form></details></section>
+const $ = id => document.getElementById(id);
+const state = { token: null, user: null, classId: '', classes: [], tasks: [], polls: [], revision: 0, requests: new Set(), timer: null, retry: 30000 };
+const roleNames = { teacher: 'Учитель', student: 'Ученик', parent: 'Родитель' };
+let noticeTimer;
+function notice(message, error = false) {
+  clearTimeout(noticeTimer);
+  $('notice').textContent = message;
+  $('notice').dataset.error = String(error);
+  $('notice').hidden = false;
+  noticeTimer = setTimeout(() => { $('notice').hidden = true; }, error ? 16000 : 8000);
+}
+function scope() {
+  state.revision++;
+  for (const request of state.requests) request.abort();
+  state.requests.clear();
+  clearTimeout(state.timer);
+}
+function clearClass() {
+  state.classId = ''; state.tasks = []; state.polls = [];
+  $('class-content').hidden = true;
+  $('tasks').replaceChildren(); $('polls').replaceChildren();
+  $('coins').textContent = '—'; $('goal').textContent = '—';
+  $('class-select').value = '';
+}
+function signedOut() {
+  scope(); clearClass(); state.token = null; state.user = null; state.classes = [];
+  $('login-screen').hidden = false; $('workspace').hidden = true;
+  $('role').hidden = true; $('logout').hidden = true;
+  $('admin-panel').hidden = true;
+  $('admin-events').replaceChildren();
+  $('class-select').replaceChildren();
+  for (const name of ['login-form','class-form','goal-form','task-form','poll-form']) $(name).reset();
+  $('login-form').elements.login.focus();
+}
+async function api(path, { method = 'GET', body } = {}) {
+  const revision = state.revision;
+  const controller = new AbortController(); state.requests.add(controller);
+  let timedOut = false;
+  const timer = setTimeout(() => { timedOut = true; controller.abort(); }, 15000);
+  try {
+    const response = await fetch(path, { method, cache: 'no-store', credentials: 'omit', redirect: 'error', referrerPolicy: 'no-referrer', signal: controller.signal,
+      headers: { ...(state.token ? { Authorization: `Bearer ${state.token}` } : {}), ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}) },
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
+    if (revision !== state.revision) throw new DOMException('Stale request', 'AbortError');
+    if (!response.ok) {
+      if (response.status === 401 && state.token) { signedOut(); throw new Error('Сессия завершена. Войдите снова.'); }
+      if (response.status === 404 && state.classId && path.startsWith(`/api/classes/${state.classId}/`)) {
+        scope(); clearClass();
+        $('no-classes').hidden = false;
+        void loadClasses().catch(report);
+        throw new Error('Этот класс или материал больше недоступен. Список классов обновлён.');
+      }
+      const messages = { 400:'Проверьте заполненные поля.', 401:'Логин или пароль не подошли.', 403:'Это действие недоступно вашей учётной записи.', 404:'Материал не найден.', 409:'Действие уже выполнено или голосование завершено. Обновите страницу класса.', 413:'Слишком большой объём данных.', 429:'Слишком много запросов. Подождите и попробуйте позже.' };
+      throw new Error(messages[response.status] ?? 'Сервер временно недоступен. Попробуйте позже.');
+    }
+    const payload = response.status === 204 ? null : await response.json();
+    if (revision !== state.revision) throw new DOMException('Stale request', 'AbortError');
+    return payload;
+  } catch (error) {
+    if (timedOut) throw new Error('Сервер не ответил вовремя. Проверьте интернет и повторите запрос.');
+    if (error instanceof TypeError) throw new Error('Нет связи с сервером. Проверьте подключение к интернету.');
+    throw error;
+  } finally { clearTimeout(timer); state.requests.delete(controller); }
+}
+function report(error) { if (error.name !== 'AbortError') notice(error.message, true); }
+async function busy(form, action) {
+  const controls = [...form.querySelectorAll('input,select,textarea,button')];
+  const disabled = controls.map(c => c.disabled);
+  controls.forEach(c => { c.disabled = true; }); form.setAttribute('aria-busy','true');
+  try { await action(); } catch (error) { report(error); }
+  finally { controls.forEach((c,i) => { c.disabled = disabled[i]; }); form.removeAttribute('aria-busy'); }
+}
+function node(tag, text, className) {
+  const value = document.createElement(tag);
+  if (text !== undefined) value.textContent = text;
+  if (className) value.className = className;
+  return value;
+}
+function empty(target, title, description) {
+  const card = node('div',undefined,'card empty');
+  card.append(node('h2',title),node('p',description)); target.append(card);
+}
+function teacherTools() {
+  const teacher = state.user?.role === 'teacher';
+  for (const name of ['class-form','goal-form','task-editor','poll-editor']) $(name).hidden = !teacher;
+  $('task-hint').textContent = state.user?.role === 'student' ? 'Одна попытка на задание. Выберите ответ внимательно.' : 'Награды учеников пополняют общую копилку.';
+  $('poll-hint').textContent = teacher ? 'Голосования учеников и родителей проходят отдельно.' : 'Один голос. До завершения его можно изменить.';
+}
+async function loadClasses(preferred) {
+  const { classes } = await api('/api/classes'); state.classes = classes;
+  $('class-select').replaceChildren(...classes.map(c => { const option = node('option',c.title); option.value = c.id; return option; }));
+  $('no-classes').hidden = classes.length > 0;
+  if (classes.length) await loadClass(classes.find(c => c.id===preferred)?.id ?? classes[0].id);
+  else clearClass();
+}
+function scheduleBank() {
+  clearTimeout(state.timer);
+  if (state.token && state.classId && !document.hidden) state.timer = setTimeout(async () => {
+    try { await loadBank(); state.retry = 30000; }
+    catch (error) { if (error.name !== 'AbortError') { $('sync').textContent = 'Нет свежих данных'; state.retry = Math.min(state.retry*2,120000); if(!state.token) report(error); } }
+    scheduleBank();
+  }, state.retry);
+}
+async function loadBank() {
+  if (!state.classId) return;
+  const { coins,goal } = await api(`/api/classes/${state.classId}/bank`);
+  $('coins').textContent = BigInt(coins).toLocaleString('ru-RU');
+  $('goal').textContent = BigInt(goal).toLocaleString('ru-RU');
+  const percent = Math.min(100,Number(BigInt(coins)*100n/BigInt(goal)));
+  $('progress').value = percent; $('percent').textContent = `${percent}%`;
+  $('goal-message').textContent = BigInt(coins)>=BigInt(goal) ? 'Цель достигнута! Пора выбирать следующее приключение.' : 'Каждый вклад приближает общее приключение.';
+  $('sync').textContent = `Обновлено в ${new Date().toLocaleTimeString('ru-RU',{ hour:'2-digit',minute:'2-digit' })}`;
+  // Do not overwrite an in-progress teacher edit during periodic refresh.
+  if (document.activeElement !== $('goal-form').elements.goal) $('goal-form').elements.goal.value = goal;
+}
+async function loadClass(classId) {
+  scope(); clearClass(); state.classId = classId; state.retry = 30000;
+  $('class-select').value = classId;
+  $('class-content').hidden = false;
+  $('sync').textContent = 'Обновляем…';
+  $('tasks').append(node('p','Загружаем задания…','muted')); $('polls').append(node('p','Загружаем голосования…','muted'));
+  $('more-tasks').hidden = true; $('more-polls').hidden = true;
+  try { await Promise.all([loadBank(),loadTasks(),loadPolls()]); }
+  finally { scheduleBank(); }
+}
+async function loadTasks(more = false) {
+  const after = more ? state.tasks.at(-1)?.id : null;
+  const { tasks } = await api(`/api/classes/${state.classId}/tasks${after ? `?after=${after}` : ''}`);
+  state.tasks = more ? [...state.tasks,...tasks] : tasks;
+  $('more-tasks').hidden = tasks.length < 100;
+  renderTasks();
+}
+function renderTasks() {
+  $('tasks').replaceChildren();
+  if (!state.tasks.length) return empty($('tasks'),'Первые задания уже в пути','Учитель добавит их сюда.');
+  for (const task of state.tasks) {
+    const card = node('article',undefined,'card task-card'); card.dataset.taskId = task.id;
+    const meta = node('div',undefined,'task-meta'); meta.append(node('span',task.myAnswer ? 'Ответ сохранён' : 'Задание','badge'),node('b',`+${task.reward} монет`));
+    const question = node('h3',task.question,'question'); question.id = `task-${task.id}`;
+    card.append(meta,question);
+    const form = node('form'); form.setAttribute('aria-labelledby',question.id);
+    task.options.forEach((text,index) => {
+      const label = node('label',undefined,`option${task.myAnswer?.selectedIndex===index ? ' is-chosen' : ''}`);
+      const radio = node('input'); radio.type = 'radio'; radio.name = 'answer'; radio.value = index; radio.required = true;
+      radio.disabled = !!task.myAnswer || state.user.role !== 'student'; radio.checked = task.myAnswer?.selectedIndex===index;
+      label.append(radio,node('span',text)); form.append(label);
+    });
+    if (state.user.role === 'student' && !task.myAnswer) {
+      const button = node('button','Отправить ответ','button primary'); button.type = 'submit'; form.append(button);
+      form.addEventListener('submit',event => {
+        event.preventDefault(); const selectedIndex = Number(new FormData(form).get('answer'));
+        void busy(form,async () => {
+          const result = await api(`/api/classes/${state.classId}/tasks/${task.id}/answers`,{ method:'POST',body:{selectedIndex} });
+          task.myAnswer = result; renderTasks();
+          notice(result.correct ? result.replayed ? 'Этот ответ уже сохранён. Повторного начисления нет.' : `Верно! В копилку класса добавлено ${result.awarded} монет.` : 'Ответ сохранён. В этот раз без монет — продолжаем учиться!');
+          await loadBank();
+        });
+      });
+    }
+    card.append(form);
+    if (task.myAnswer) card.append(node('p',task.myAnswer.correct ? `Верно! +${task.myAnswer.awarded} монет уже в общей копилке.` : 'Ответ сохранён. В этот раз без монет.',`answer-feedback${task.myAnswer.correct ? '' : ' incorrect'}`));
+    $('tasks').append(card);
+  }
+}
+async function loadPolls(more = false) {
+  const after = more ? state.polls.at(-1)?.id : null;
+  const { polls } = await api(`/api/classes/${state.classId}/polls${after ? `?after=${after}` : ''}`);
+  state.polls = more ? [...state.polls,...polls] : polls;
+  $('more-polls').hidden = polls.length < 100;
+  renderPolls();
+}
+function renderPolls() {
+  $('polls').replaceChildren();
+  if (!state.polls.length) return empty($('polls'),'Пока без голосований','Когда откроется голосование для вас, оно появится здесь.');
+  for (const poll of state.polls) {
+    const card = node('article',undefined,'card poll-card'); card.dataset.pollId = poll.id;
+    const closed = Date.parse(poll.closes_at) <= Date.now();
+    const meta = node('div',undefined,'task-meta'); meta.append(node('span',poll.audience==='student' ? 'Ученики' : 'Родители','badge'),node('span',closed ? 'Завершено' : 'Голосование открыто','muted'));
+    const title = node('h3',poll.title,'question'); title.id = `poll-${poll.id}`;
+    card.append(meta,title,node('p',`До ${new Date(poll.closes_at).toLocaleString('ru-RU',{dateStyle:'medium',timeStyle:'short'})}`,'muted'));
+    const form = node('form'); form.setAttribute('aria-labelledby',title.id);
+    poll.options.forEach((text,index) => {
+      const label = node('label',undefined,`option${poll.myVote===index ? ' is-chosen' : ''}`);
+      const radio = node('input'); radio.type = 'radio'; radio.name = 'vote'; radio.value = index; radio.required = true; radio.checked = poll.myVote===index;
+      radio.disabled = closed || state.user.role !== poll.audience;
+      label.append(radio,node('span',text)); form.append(label);
+    });
+    if (state.user.role===poll.audience && !closed) {
+      const button = node('button',poll.myVote===null ? 'Голосовать' : 'Изменить голос','button primary'); button.type = 'submit'; form.append(button);
+      form.addEventListener('submit',event => {
+        event.preventDefault(); const optionIndex = Number(new FormData(form).get('vote'));
+        void busy(form,async () => {
+          try { await api(`/api/classes/${state.classId}/polls/${poll.id}/votes`,{method:'POST',body:{optionIndex}}); poll.myVote = optionIndex; renderPolls(); notice('Ваш голос сохранён.'); }
+          catch (error) { if (error.name!=='AbortError' && state.classId) void loadPolls().catch(report); throw error; }
+        });
+      });
+    }
+    card.append(form);
+    if (poll.myVote!==null) card.append(node('p','Ваш выбор сохранён.','answer-feedback'));
+    if (state.user.role==='teacher') {
+      const button = node('button','Посмотреть результаты','button secondary');
+      const results = node('ul',undefined,'result-list'); results.setAttribute('aria-live','polite');
+      button.addEventListener('click',() => { void busy(card,async()=>{
+        const { counts } = await api(`/api/classes/${state.classId}/polls/${poll.id}/results`);
+        results.replaceChildren(...poll.options.map((text,index) => { const li = node('li'); li.append(node('span',text),node('b',String(counts.find(c=>c.option_index===index)?.votes ?? 0))); return li; }));
+      }); }); card.append(button,results);
+    }
+    $('polls').append(card);
+  }
+}
+function tab(name) {
+  for (const target of ['bank','tasks','polls']) $(target+'-panel').hidden = target!==name;
+  for (const button of document.querySelectorAll('[data-tab]')) {
+    if (button.dataset.tab===name) button.setAttribute('aria-current','page'); else button.removeAttribute('aria-current');
+  }
+}
+function optionsFrom(form) {
+  const options = form.elements.options.value.trim().split(/\r?\n/).map(value=>value.trim());
+  if (options.length<2 || options.length>6 || options.some(value=>!value || value.length>300)) throw new Error('Укажите от 2 до 6 вариантов, каждый до 300 символов, без пустых строк.');
+  return options;
+}
+$('login-form').addEventListener('submit',event=>{
+  event.preventDefault(); const form = event.currentTarget;
+  const body = { login:form.elements.login.value.trim(),password:form.elements.password.value };
+  …4112 tokens truncated…/div><button class="button primary" type="submit">Опубликовать задание</button><p class="form-note">Задание нельзя изменить после публикации. Не указывайте личные данные детей.</p></form></details></section>
         <section id="polls-panel" hidden><div class="section-heading"><div><span class="eyebrow">Решаем вместе</span><h2>Наше приключение</h2></div><p id="poll-hint" class="muted"></p></div><div id="polls" class="card-grid"></div><button id="more-polls" class="button secondary" hidden>Ещё голосования</button><details id="poll-editor" class="card editor" hidden><summary>Создать голосование</summary><form id="poll-form"><label>Вопрос<input name="title" maxlength="200" required placeholder="Куда отправимся всем классом?"></label><label>Кто голосует<select name="audience"><option value="student">Ученики</option><option value="parent">Родители</option></select></label><label>Варианты — каждый с новой строки<textarea name="options" required rows="4"></textarea></label><label>Завершение по вашему местному времени<input name="closesAt" type="datetime-local" required></label><button class="button primary" type="submit">Открыть голосование</button><p class="form-note">До 90 дней. Решения о расходах и безопасности согласуются отдельно.</p></form></details></section>
       </div>
     </section>

@@ -1,5 +1,5 @@
 // Cache only the public shell. Never intercept API requests, answers or sessions.
-const CACHE = 'klasskvest-shell-v1';
+const CACHE = 'klasskvest-shell-v2';
 const SHELL = ['/', '/app.js', '/styles.css', '/manifest.webmanifest', '/icon.svg', '/icon-192.png', '/icon-512.png'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL)));

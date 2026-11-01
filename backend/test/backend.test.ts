@@ -135,6 +135,44 @@ test('PostgreSQL API integration', { skip: !database }, async t => {
     assert.equal((await call('POST',url,audience,{optionIndex:0})).statusCode,409);
    }
   });
+  await t.test('administrator sandbox switches rotate sessions and isolate real classes',async()=>{
+   assert.equal((await call('POST','/api/admin/switch-role','outsider',{role:'student'})).statusCode,403);
+   assert.equal((await call('GET','/api/admin/overview','parent')).statusCode,403);
+   await pool.query('UPDATE users SET is_admin=true WHERE id=$1',[ids.outsider]);
+   assert.equal((await call('GET','/api/admin/overview','outsider')).statusCode,200);
+   const original=tokens.outsider;
+   const switched=await call('POST','/api/admin/switch-role','outsider',{role:'student'});
+   assert.equal(switched.statusCode,200,switched.body);
+   assert.equal((await call('GET','/api/me','outsider')).statusCode,401);
+   tokens.outsider=switched.json().token;
+   const demo=(await call('GET','/api/me','outsider')).json().user;
+   assert.equal(demo.role,'student'); assert.equal(demo.testRole,true);
+   assert.equal(demo.administratorId,ids.outsider);
+   assert.equal((await call('GET','/api/admin/overview','outsider')).statusCode,403);
+   assert.equal((await call('GET',`/api/classes/${classId}/bank`,'outsider')).statusCode,404);
+   const dc=(await call('GET','/api/classes','outsider')).json().classes;
+   assert.equal(dc.length,1);
+   const dt=(await call('GET',`/api/classes/${dc[0].id}/tasks`,'outsider')).json().tasks[0];
+   assert.equal((await call('POST',`/api/classes/${dc[0].id}/tasks/${dt.id}/answers`,'outsider',{selectedIndex:0})).json().awarded,10);
+   for (const role of ['parent','teacher','admin']) {
+    const r=await call('POST','/api/admin/switch-role','outsider',{role}); assert.equal(r.statusCode,200,r.body); tokens.outsider=r.json().token;
+    assert.equal((await call('GET','/api/me','outsider')).json().user.role,role==='admin'?'teacher':role);
+   }
+   assert.notEqual(tokens.outsider,original);
+   assert.equal((await pool.query('SELECT count(*)::int AS n FROM admin_events WHERE administrator_id=$1',[ids.outsider])).rows[0].n,4);
+   const r=await call('POST','/api/admin/switch-role','outsider',{role:'student'});tokens.outsider=r.json().token;
+   await pool.query('UPDATE users SET is_admin=false WHERE id=$1',[ids.outsider]);
+   assert.equal((await call('GET','/api/me','outsider')).statusCode,401);
+   await pool.query('DELETE FROM sessions WHERE administrator_id=$1',[ids.outsider]);
+   const demos=(await pool.query('SELECT user_id FROM admin_demo_accounts WHERE administrator_id=$1',[ids.outsider])).rows.map(x=>x.user_id);
+   const demoClasses=(await pool.query('SELECT DISTINCT class_id FROM memberships WHERE user_id=ANY($1::uuid[])',[demos])).rows.map(x=>x.class_id);
+   await pool.query('DELETE FROM votes WHERE user_id=ANY($1::uuid[])',[demos]);
+   for(const table of ['polls','coin_ledger','answers','tasks','memberships','classes']) await pool.query(`DELETE FROM ${table} WHERE ${table==='classes'?'id':'class_id'}=ANY($1::uuid[])`,[demoClasses]);
+   await pool.query('DELETE FROM guardian_links WHERE parent_id=ANY($1::uuid[])',[demos]);
+   await pool.query('DELETE FROM admin_demo_accounts WHERE administrator_id=$1',[ids.outsider]);
+   await pool.query('DELETE FROM admin_events WHERE administrator_id=$1',[ids.outsider]);
+   await pool.query('DELETE FROM users WHERE id=ANY($1::uuid[])',[demos]);
+  });
   await t.test('revoking consent removes access immediately',async()=>{
    await pool.query('DELETE FROM guardian_links WHERE student_id=$1',[ids.student]);
    assert.equal((await call('GET',`/api/classes/${classId}/bank`,'student')).statusCode,404);

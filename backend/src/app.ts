@@ -4,10 +4,11 @@ import rateLimit from '@fastify/rate-limit';
 import { z } from 'zod';
 import type pg from 'pg';
 import { readFile } from 'node:fs/promises';
+import { switchRole } from './administration.js';
 import { transaction } from './db.js';
 import { digest, token, hashPassword, verifyPassword } from './security.js';
 
-type Actor = { id: string; role: 'teacher' | 'student' | 'parent' };
+type Actor = { id: string; role: 'teacher' | 'student' | 'parent'; administratorId?: string; testRole?: boolean };
 declare module 'fastify' { interface FastifyRequest { actor: Actor; sessionHash: string } }
 export class HttpError extends Error { constructor(public statusCode: number, message: string) { super(message); } }
 const uuid = z.string().uuid();
@@ -54,7 +55,7 @@ export async function buildApp(pool: pg.Pool, sessionHours = 8, behindProxy = fa
    const raw = req.headers.authorization;
    if (!raw || !/^Bearer [A-Za-z0-9_-]{43}$/.test(raw)) throw new HttpError(401,'Authentication required');
    req.sessionHash = digest(raw.slice(7));
-   const actor = (await pool.query(`SELECT u.id,u.role FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now() AND u.active`,[req.sessionHash])).rows[0];
+   const actor = (await pool.query(`SELECT u.id,u.role, CASE WHEN s.administrator_id IS NOT NULL THEN a.id WHEN u.is_admin THEN u.id END AS "administratorId", s.administrator_id IS NOT NULL AS "testRole" FROM sessions s JOIN users u ON u.id=s.user_id LEFT JOIN users a ON a.id=s.administrator_id AND a.active AND a.is_admin WHERE s.token_hash=$1 AND s.expires_at>now() AND u.active AND (s.administrator_id IS NULL OR (a.id IS NOT NULL AND EXISTS(SELECT 1 FROM admin_demo_accounts d WHERE d.administrator_id=a.id AND d.user_id=u.id)))`,[req.sessionHash])).rows[0];
    if (!actor) throw new HttpError(401,'Authentication required');
    req.actor = actor;
   });
@@ -63,6 +64,19 @@ export async function buildApp(pool: pg.Pool, sessionHours = 8, behindProxy = fa
    const found = await pool.query(`SELECT 1 FROM memberships m WHERE m.class_id=$1 AND m.user_id=$2 AND ($3 <> 'student' OR EXISTS(SELECT 1 FROM guardian_links g JOIN users p ON p.id=g.parent_id AND p.active WHERE g.student_id=$2)) AND ($3 <> 'parent' OR EXISTS(SELECT 1 FROM guardian_links g JOIN memberships child ON child.user_id=g.student_id AND child.class_id=$1 JOIN users s ON s.id=g.student_id AND s.active WHERE g.parent_id=$2))`,[classId,req.actor.id,req.actor.role]);
    if (!found.rowCount) throw new HttpError(404,'Class not found');
   };
+  api.get('/api/admin/overview', async req => {
+   if (!req.actor.administratorId || req.actor.testRole) throw new HttpError(403,'Administrator required');
+   const counts=(await pool.query('SELECT (SELECT count(*)::int FROM users WHERE active) AS users,(SELECT count(*)::int FROM classes) AS classes,(SELECT count(*)::int FROM tasks) AS tasks')).rows[0];
+   const events=(await pool.query('SELECT action,created_at FROM admin_events WHERE administrator_id=$1 ORDER BY created_at DESC,id DESC LIMIT 10',[req.actor.id])).rows;
+   return {counts,events};
+  });
+  api.post('/api/admin/switch-role', async req => {
+   if (!req.actor.administratorId) throw new HttpError(403,'Administrator required');
+   const {role}=z.object({role:z.enum(['admin','teacher','student','parent'])}).strict().parse(req.body);
+   const result=await switchRole(pool,req.actor.administratorId,role,req.sessionHash);
+   if (!result) throw new HttpError(403,'Administrator required');
+   return result;
+  });
   api.get('/api/me', async req => ({ user: req.actor }));
   api.post('/api/auth/logout', async (req, reply) => { await pool.query('DELETE FROM sessions WHERE token_hash=$1',[req.sessionHash]); return reply.code(204).send(); });
   api.get('/api/classes', async req => {

@@ -9,7 +9,14 @@ const [command,...args] = process.argv.slice(2);
 const id = z.string().uuid();
 const password = () => z.string().min(12).max(128).parse(readFileSync(0,'utf8').trim());
 try {
- if (command==='user') {
+ if (command==='grant-admin' || command==='revoke-admin') {
+  const [userId]=z.tuple([id]).parse(args);
+  await transaction(pool,async db=>{
+   const changed=await db.query("UPDATE users SET is_admin=$2 WHERE id=$1 AND role='teacher' RETURNING id",[userId,command==='grant-admin']);
+   if (!changed.rowCount) throw new Error('Teacher account not found');
+   await db.query('DELETE FROM sessions WHERE user_id=$1 OR administrator_id=$1',[userId]);
+  });
+ } else if (command==='user') {
   const [login,role,alias] = z.tuple([z.string().regex(/^[a-z0-9_-]{3,64}$/),z.enum(['teacher','parent','student']),z.string().min(1).max(40)]).parse(args);
   console.log((await pool.query('INSERT INTO users(login,role,alias,password_hash) VALUES($1,$2,$3,$4) RETURNING id',[login,role,alias,await hashPassword(password())])).rows[0]);
  } else if (command==='member') {
